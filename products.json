@@ -1,0 +1,35 @@
+[
+    {
+        "id": 1,
+        "title": "Laptop Gaming",
+        "description": "Laptop con 16GB de RAM y 512GB SSD.",
+        "code": "LAPTOP-GAMING-001",
+        "price": 1200.00,
+        "status": true,
+        "stock": 5,
+        "category": "Electronics",
+        "thumbnails": ["url1", "url2"]
+    },
+    {
+        "id": 2,
+        "title": "Smartphone",
+        "description": "Smartphone con pantalla de 6.5 pulgadas y 128GB de almacenamiento.",
+        "code": "SMARTPHONE-002",
+        "price": 800.00,
+        "status": true,
+        "stock": 15,
+        "category": "Electronics",
+        "thumbnails": ["url3"]
+    },
+    {
+        "id": 3,
+        "title": "Auriculares Bluetooth",
+        "description": "Auriculares inalámbricos con cancelación de ruido.",
+        "code": "AURICULARES-003",
+        "price": 150.00,
+        "status": true,
+        "stock": 25,
+        "category": "Accesorios",
+        "thumbnails": ["url4"]
+    }
+]
