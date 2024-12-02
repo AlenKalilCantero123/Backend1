@@ -1,105 +1,106 @@
-import fs from 'fs/promises';
+// managers/CartManager.js
+import Cart from '../models/cart.js';
 
 class CartManager {
-    constructor(path) {
-        this.path = path;
+  // Método para crear un carrito
+  async createCart() {
+    const cart = new Cart();
+    await cart.save();
+    return cart;
+  }
+
+  // Método para obtener un carrito por ID
+  async getCartById(cartId) {
+    return await Cart.findById(cartId).populate('products.product'); // Devuelve el carrito con productos
+  }
+
+  // Método para agregar un producto al carrito
+  async addProductToCart(cartId, productId, quantity = 1) {
+    if (quantity <= 0 || isNaN(quantity)) {
+      return { error: "La cantidad debe ser mayor que 0" }; // Validación de cantidad
     }
 
-    async getCarts() {
-        try {
-            const data = await fs.readFile(this.path, 'utf-8');
-            return JSON.parse(data);
-        } catch (error) {
-            return [];
-        }
+    const cart = await Cart.findById(cartId);
+
+    if (!cart) {
+      return { error: "Cart not found" }; // Si el carrito no existe
     }
 
-    async getCartById(id) {
-        const carts = await this.getCarts();
-        return carts.find(cart => cart.id === parseInt(id)) || null;
+    const existingProductIndex = cart.products.findIndex(prod => prod.product.toString() === productId);
+
+    if (existingProductIndex !== -1) {
+      // Si el producto ya está en el carrito, actualizamos su cantidad
+      cart.products[existingProductIndex].quantity += quantity;
+    } else {
+      // Si el producto no está en el carrito, lo agregamos con la cantidad
+      cart.products.push({ product: productId, quantity });
     }
 
-    async createCart() {
-        const carts = await this.getCarts();
-        const newCart = { id: carts.length ? carts[carts.length - 1].id + 1 : 1, products: [] };
-        carts.push(newCart);
-        await fs.writeFile(this.path, JSON.stringify(carts, null, 2));
-        return newCart;
+    await cart.save(); // Guardamos el carrito actualizado
+    return cart;
+  }
+
+  // Método para eliminar un producto del carrito
+  async removeProductFromCart(cartId, productId) {
+    const cart = await Cart.findById(cartId);
+
+    if (!cart) {
+      return { error: "Cart not found" }; // Si el carrito no existe
     }
 
-    async addProductToCart(cartId, productId, quantity = 1) {
-        const carts = await this.getCarts();
-        const cart = carts.find(cart => cart.id === parseInt(cartId));
-        if (!cart) return { error: "Cart not found" };
+    // Encontramos el índice del producto
+    const productIndex = cart.products.findIndex(prod => prod.product.toString() === productId);
 
-        const existingProduct = cart.products.find(prod => prod.product === parseInt(productId));
-        if (existingProduct) {
-            existingProduct.quantity += quantity;
-        } else {
-            cart.products.push({ product: parseInt(productId), quantity });
-        }
-
-        await fs.writeFile(this.path, JSON.stringify(carts, null, 2));
-        return cart;
+    if (productIndex === -1) {
+      return { error: "Product not found in cart" }; // Si el producto no está en el carrito
     }
+
+    // Eliminar el producto
+    cart.products.splice(productIndex, 1);
+
+    await cart.save(); // Guardamos el carrito actualizado
+    return cart;
+  }
+
+  // Método para actualizar la cantidad de un producto en el carrito
+  async updateProductQuantity(cartId, productId, quantity) {
+    if (quantity <= 0 || isNaN(quantity)) {
+      return { error: "La cantidad debe ser mayor que 0" }; // Validación de cantidad
+    }
+
+    const cart = await Cart.findById(cartId);
+
+    if (!cart) {
+      return { error: "Cart not found" }; // Si el carrito no existe
+    }
+
+    const productIndex = cart.products.findIndex(prod => prod.product.toString() === productId);
+
+    if (productIndex === -1) {
+      return { error: "Product not found in cart" }; // Si el producto no está en el carrito
+    }
+
+    // Actualizamos la cantidad del producto
+    cart.products[productIndex].quantity = quantity;
+
+    await cart.save(); // Guardamos el carrito actualizado
+    return cart;
+  }
+
+  // Método para limpiar el carrito (eliminar todos los productos)
+  async clearCart(cartId) {
+    const cart = await Cart.findById(cartId);
+
+    if (!cart) {
+      return { error: "Cart not found" }; // Si el carrito no existe
+    }
+
+    // Limpiamos los productos del carrito
+    cart.products = [];
+
+    await cart.save(); // Guardamos el carrito vacío
+    return cart;
+  }
 }
 
-export default new CartManager('./carts.json');
-
-
-
-
-
-
-//comentario
-
-
-// import fs from 'fs/promises';
-
-// class CartManager {
-//     constructor(path) {
-//         this.path = path;
-//     }
-
-//     async getCarts() {
-//         try {
-//             const data = await fs.readFile(this.path, 'utf-8');
-//             return JSON.parse(data);
-//         } catch (error) {
-//             return [];
-//         }
-//     }
-
-
-//     async getCartById(id) {
-//         const carts = await this.getCarts();
-//         return carts.find(cart => cart.id === parseInt(id)) || null;
-//     }
-    
-//     async createCart() {
-//         const carts = await this.getCarts();
-//         const newCart = { id: carts.length ? carts[carts.length - 1].id + 1 : 1, products: [] };
-//         carts.push(newCart);
-//         await fs.writeFile(this.path, JSON.stringify(carts, null, 2));
-//         return newCart;
-//     }
-//     async addProductToCart(cartId, productId, quantity = 1) {
-//         const carts = await this.getCarts();
-//         const cart = carts.find(cart => cart.id === parseInt(cartId));
-//         if (!cart) return null;
-    
-//         const existingProduct = cart.products.find(prod => prod.product === parseInt(productId));
-//         if (existingProduct) {
-//             existingProduct.quantity += quantity;
-//         } else {
-//             cart.products.push({ product: parseInt(productId), quantity });
-//         }
-    
-//         await fs.writeFile(this.path, JSON.stringify(carts, null, 2));
-//         return cart;
-//     }
-    
-//     // Implementa las demás funciones aquí, como getCartById, addProductToCart.
-// }
-
-// export default new CartManager('./carts.json');
+export default new CartManager();

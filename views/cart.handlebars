@@ -1,0 +1,28 @@
+<!-- cart.handlebars -->
+<h1>Tu Carrito de Compras</h1>
+
+{{#if cart.products.length}}
+    <ul>
+        {{#each cart.products}}
+            <li>
+                <p>{{this.product.name}} - ${{this.product.price}} x {{this.quantity}}</p>
+                <!-- Formulario para actualizar la cantidad -->
+                <form action="/cart/update/{{this._id}}" method="POST">
+                    <input type="number" name="quantity" value="{{this.quantity}}" min="1" />
+                    <button type="submit">Actualizar cantidad</button>
+                </form>
+
+                <!-- Formulario para eliminar el producto -->
+                <form action="/cart/remove/{{this._id}}" method="POST">
+                    <button type="submit">Eliminar producto</button>
+                </form>
+            </li>
+        {{/each}}
+    </ul>
+    <p><strong>Total: ${{cart.total}}</strong></p>
+    <form action="/cart/clear" method="POST">
+        <button type="submit">Eliminar todos los productos del carrito</button>
+    </form>
+{{else}}
+    <p>Tu carrito está vacío.</p>
+{{/if}}

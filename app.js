@@ -1,172 +1,106 @@
+import mongoose from 'mongoose';
 import express from 'express';
 import http from 'http';
-import { Server } from 'socket.io';  // Importar correctamente Socket.io
-import expressHandlebars from 'express-handlebars';  // Importar correctamente el módulo
+import { Server } from 'socket.io';
+import expressHandlebars from 'express-handlebars';
 
-import productsRouter from './Routes/products.js'; // Asegúrate de que la carpeta se llama 'routes'
-import cartsRouter from './Routes/carts.js';       // Asegúrate de que la carpeta se llama 'routes'
+import productsRouter from '../Backend1/Routes/products.js';
+import cartsRouter from '../Backend1/Routes/carts.js';
+import cartManager from '../Backend1/managers/CartManager.js'; // Instancia única
+import productManagerFactory from '../Backend1/managers/ProductManager.js';  // Importación del factory
 
-// Crear la aplicación de Express
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);  // Usamos la exportación 'Server' de socket.io
+const io = new Server(server);
 
-// Configuración de Handlebars (usando create() para obtener la instancia correcta)
-const hbs = expressHandlebars.create();  // Crear la instancia del motor de plantillas
-app.engine('handlebars', hbs.engine);  // Configuramos el motor de plantillas Handlebars
+// Configuración de Handlebars
+const hbs = expressHandlebars.create();
+app.engine('handlebars', hbs.engine);
 app.set('view engine', 'handlebars');
 
-// Middleware para manejar los datos POST
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Datos de productos (usaremos una estructura simple de array para esto)
-let productos = [
-    { id: 1, nombre: 'Producto 1', precio: 100 },
-    { id: 2, nombre: 'Producto 2', precio: 200 },
-];
+// Conexión con MongoDB
+const url = 'mongodb+srv://alenkalilcantero:GfiSgiBAJquEu3TV@cluster0Backend.wonj1.mongodb.net/Backend?retryWrites=true&w=majority';
+mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => {
+    console.log('Conexión exitosa a MongoDB Atlas');
 
-// Rutas estáticas (productos y carritos)
-app.use('/api/products', productsRouter);
-app.use('/api/carts', cartsRouter);
+    // Crear la instancia de productManager después de la conexión a MongoDB
+    const db = mongoose.connection.db; // Obtener la conexión activa a la base de datos
+    const productManager = productManagerFactory(db); // Usar el factory para crear la instancia
 
-// Ruta para mostrar la página de productos (Página de inicio con todos los productos)
-app.get('/', (req, res) => {
-    res.render('home', { productos });
-});
+    // Usar rutas
+    app.use('/api/products', productsRouter);
+    app.use('/api/carts', cartsRouter);
 
-// Ruta para mostrar la página en tiempo real de productos (realTimeProducts)
-app.get('/realtimeproducts', (req, res) => {
-    res.render('realTimeProducts', { productos });
-});
-
-// Iniciar el servidor
-const PORT = 8080;
-server.listen(PORT, () => {
-    console.log(`Servidor escuchando en http://localhost:${PORT}`);
-});
-
-// Conexión de websockets
-io.on('connection', (socket) => {
-    console.log('Un cliente se ha conectado');
-    
-    // Emitir los productos actuales al nuevo cliente al momento de la conexión
-    socket.emit('productosIniciales', productos);
-
-    // Agregar un producto (desde websocket)
-    socket.on('agregarProducto', (producto) => {
-        const nuevoProducto = { 
-            id: productos.length + 1, 
-            nombre: producto.nombre, 
-            precio: parseFloat(producto.precio) 
-        };
-        productos.push(nuevoProducto);
-        io.emit('nuevoProducto', nuevoProducto);  // Emitir el nuevo producto a todos los clientes conectados
+    // Ruta para la vista de productos (manejo de Handlebars)
+    app.get('/', async (req, res) => {
+      try {
+        const products = await productManager.getProducts();
+        res.render('home', { products }); // Pasar productos a la vista
+      } catch (err) {
+        console.log('Error al obtener productos:', err);
+        res.status(500).send('Error al obtener los productos');
+      }
     });
 
-    // Eliminar un producto (desde websocket)
-    socket.on('eliminarProducto', (id) => {
-        productos = productos.filter(producto => producto.id != id);
-        io.emit('productoEliminado', id);  // Emitir la eliminación a todos los clientes conectados
+    // Ruta para los productos en tiempo real
+    app.get('/realtimeproducts', (req, res) => {
+      res.render('realTimeProducts');
     });
 
-    socket.on('disconnect', () => {
+    // Iniciar el servidor
+    const PORT = 8080;
+    server.listen(PORT, () => {
+      console.log(`Servidor escuchando en http://localhost:${PORT}`);
+    });
+
+    // Conexión de WebSockets
+    io.on('connection', (socket) => {
+      console.log('Un cliente se ha conectado');
+
+      // Enviar productos iniciales desde MongoDB
+      productManager.getProducts()
+        .then(products => {
+          socket.emit('productosIniciales', products);
+        })
+        .catch(err => console.log('Error al obtener productos:', err));
+
+      // Agregar un producto
+      socket.on('agregarProducto', async (producto) => {
+        try {
+          const newProduct = await productManager.addProduct({
+            name: producto.nombre,
+            price: producto.precio,
+            category: producto.categoria,
+            status: producto.disponible ? 'available' : 'unavailable',
+          });
+          io.emit('nuevoProducto', newProduct); // Emitir el nuevo producto a todos los clientes
+        } catch (err) {
+          console.log('Error al agregar producto:', err);
+        }
+      });
+
+      // Eliminar un producto
+      socket.on('eliminarProducto', async (id) => {
+        try {
+          const success = await productManager.deleteProduct(id);
+          if (success) {
+            io.emit('productoEliminado', id); // Emitir la eliminación a todos los clientes
+          } else {
+            console.log('Producto no encontrado para eliminar:', id);
+          }
+        } catch (err) {
+          console.log('Error al eliminar producto:', err);
+        }
+      });
+
+      socket.on('disconnect', () => {
         console.log('Un cliente se ha desconectado');
+      });
     });
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// import express from 'express';
-// import http from 'http';
-// import { Server } from 'socket.io';  // Importar correctamente Socket.io
-// import expressHandlebars from 'express-handlebars';  // Importar correctamente el módulo
-
-// import productsRouter from './Routes/products.js'; // Asegúrate de que la carpeta se llama 'routes'
-// import cartsRouter from './Routes/carts.js';       // Asegúrate de que la carpeta se llama 'routes'
-
-// // Crear la aplicación de Express
-// const app = express();
-// const server = http.createServer(app);
-// const io = new Server(server);  // Usamos la exportación 'Server' de socket.io
-
-// // Configuración de Handlebars (usando create() para obtener la instancia correcta)
-// const hbs = expressHandlebars.create();  // Crear la instancia del motor de plantillas
-// app.engine('handlebars', hbs.engine);  // Configuramos el motor de plantillas Handlebars
-// app.set('view engine', 'handlebars');
-
-// // Middleware para manejar los datos POST
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: true }));
-
-// // Datos de productos (usaremos una estructura simple de array para esto)
-// let productos = [
-//     { id: 1, nombre: 'Producto 1', precio: 100 },
-//     { id: 2, nombre: 'Producto 2', precio: 200 },
-// ];
-
-// // Rutas estáticas (productos y carritos)
-// app.use('/api/products', productsRouter);
-// app.use('/api/carts', cartsRouter);
-
-// // Ruta para mostrar la página de productos
-// app.get('/', (req, res) => {
-//     res.render('home', { productos });
-// });
-
-// // Ruta para mostrar la página en tiempo real de productos
-// app.get('/realtimeproducts', (req, res) => {
-//     res.render('realTimeProducts', { productos });
-// });
-
-// // Iniciar el servidor
-// const PORT = 8080;
-// server.listen(PORT, () => {
-//     console.log(`Servidor escuchando en http://localhost:${PORT}`);
-// });
-
-// // Conexión de websockets
-// io.on('connection', (socket) => {
-//     console.log('Un cliente se ha conectado');
-    
-//     // Emitir los productos actuales al nuevo cliente
-//     socket.emit('productosIniciales', productos);
-
-//     // Agregar un producto (desde websocket)
-//     socket.on('agregarProducto', (producto) => {
-//         const nuevoProducto = { 
-//             id: productos.length + 1, 
-//             nombre: producto.nombre, 
-//             precio: parseFloat(producto.precio) 
-//         };
-//         productos.push(nuevoProducto);
-//         io.emit('nuevoProducto', nuevoProducto);  // Emitir el nuevo producto a todos
-//     });
-
-//     // Eliminar un producto (desde websocket)
-//     socket.on('eliminarProducto', (id) => {
-//         productos = productos.filter(producto => producto.id != id);
-//         io.emit('productoEliminado', id);  // Emitir la eliminación a todos
-//     });
-
-//     socket.on('disconnect', () => {
-//         console.log('Un cliente se ha desconectado');
-//     });
-// });
+  })
+  .catch(err => console.log('Error de conexión:', err));
