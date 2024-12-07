@@ -7,7 +7,7 @@ import expressHandlebars from 'express-handlebars';
 import productsRouter from '../Backend1/Routes/products.js';
 import cartsRouter from '../Backend1/Routes/carts.js';
 import cartManager from '../Backend1/managers/CartManager.js'; // Instancia única
-import productManagerFactory from '../Backend1/managers/ProductManager.js';  // Importación del factory
+import productManagerFactory from '../Backend1/managers/ProductManager.js'; // Importación del factory
 
 const app = express();
 const server = http.createServer(app);
@@ -24,7 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Conexión con MongoDB
 const url = 'mongodb+srv://alenkalilcantero:GfiSgiBAJquEu3TV@cluster0Backend.wonj1.mongodb.net/Backend?retryWrites=true&w=majority';
-mongoose.connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
+mongoose.connect(url)
   .then(() => {
     console.log('Conexión exitosa a MongoDB Atlas');
 
