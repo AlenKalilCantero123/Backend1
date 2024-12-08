@@ -9,38 +9,36 @@
     <h1>Productos en Tiempo Real</h1>
     
     <ul id="productos-list">
-        <!-- Este bloque se usa para renderizar los productos con Handlebars en el servidor -->
-        {{#each productos}}
-            <li id="producto-{{this.id}}">
-                {{this.nombre}} - ${{this.precio}} 
-                <button class="delete-button" data-id="{{this.id}}">Eliminar</button>
+        {{#each products}}
+            <li id="producto-{{this._id}}">
+                {{this.name}} - ${{this.price}} - Categoría: {{this.category}}
+                <button class="delete-button" data-id="{{this._id}}">Eliminar</button>
             </li>
         {{/each}}
     </ul>
 
     <h3>Agregar Producto</h3>
     <form id="addProductForm">
-        <input type="text" name="nombre" placeholder="Nombre del producto" required>
-        <input type="number" name="precio" placeholder="Precio" required>
+        <input type="text" name="name" placeholder="Nombre del producto" required>
+        <input type="number" name="price" placeholder="Precio" required>
+        <input type="text" name="category" placeholder="Categoría" required>
         <button type="submit">Agregar Producto</button>
     </form>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io();  // Conexión WebSocket con el servidor
+        const socket = io();
         const productosList = document.getElementById('productos-list');
         const addProductForm = document.getElementById('addProductForm');
 
-        // Recibir los productos iniciales desde el servidor al conectarse (al cargar la página)
+        // Recibir productos iniciales
         socket.on('productosIniciales', (productos) => {
-            // Primero, limpiar la lista para evitar duplicados
             productosList.innerHTML = '';
-            // Renderizamos la lista de productos
             productos.forEach(producto => {
                 const li = document.createElement('li');
-                li.id = `producto-${producto.id}`;
-                li.innerHTML = `${producto.nombre} - $${producto.precio} 
-                    <button class="delete-button" data-id="${producto.id}">Eliminar</button>`;
+                li.id = `producto-${producto._id}`;
+                li.innerHTML = `${producto.name} - $${producto.price} - Categoría: ${producto.category}
+                    <button class="delete-button" data-id="${producto._id}">Eliminar</button>`;
                 productosList.appendChild(li);
             });
         });
@@ -48,9 +46,9 @@
         // Recibir un nuevo producto agregado
         socket.on('nuevoProducto', (producto) => {
             const nuevoProducto = document.createElement('li');
-            nuevoProducto.id = `producto-${producto.id}`;
-            nuevoProducto.innerHTML = `${producto.nombre} - $${producto.precio} 
-                <button class="delete-button" data-id="${producto.id}">Eliminar</button>`;
+            nuevoProducto.id = `producto-${producto._id}`;
+            nuevoProducto.innerHTML = `${producto.name} - $${producto.price} - Categoría: ${producto.category}
+                <button class="delete-button" data-id="${producto._id}">Eliminar</button>`;
             productosList.appendChild(nuevoProducto);
         });
 
@@ -62,22 +60,21 @@
             }
         });
 
-        // Enviar un producto nuevo al servidor cuando se envíe el formulario
+        // Agregar producto
         addProductForm.addEventListener('submit', (e) => {
-            e.preventDefault();  // Prevenir la acción por defecto del formulario
-            const nombre = e.target.nombre.value;
-            const precio = e.target.precio.value;
-            // Emitir evento para agregar el producto
-            socket.emit('agregarProducto', { nombre, precio });
-            // Limpiar el formulario
+            e.preventDefault();
+            const name = e.target.name.value;
+            const price = e.target.price.value;
+            const category = e.target.category.value;
+
+            socket.emit('agregarProducto', { name, price, category });
             addProductForm.reset();
         });
 
-        // Eliminar producto cuando se hace clic en el botón de eliminar
+        // Eliminar producto
         productosList.addEventListener('click', (e) => {
             if (e.target.classList.contains('delete-button')) {
                 const id = e.target.getAttribute('data-id');
-                // Emitir evento para eliminar el producto
                 socket.emit('eliminarProducto', id);
             }
         });

@@ -23,7 +23,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Conexión con MongoDB
-const url = 'mongodb+srv://alenkalilcantero:GfiSgiBAJquEu3TV@cluster0Backend.wonj1.mongodb.net/Backend?retryWrites=true&w=majority';
+const url = 'mongodb+srv://alenkalilcantero:123alen@cluster0Backend.wonj1.mongodb.net/Backend?retryWrites=true&w=majority';
 mongoose.connect(url)
   .then(() => {
     console.log('Conexión exitosa a MongoDB Atlas');
@@ -42,7 +42,7 @@ mongoose.connect(url)
         const products = await productManager.getProducts();
         res.render('home', { products }); // Pasar productos a la vista
       } catch (err) {
-        console.log('Error al obtener productos:', err);
+        console.error('Error al obtener productos:', err.message);
         res.status(500).send('Error al obtener los productos');
       }
     });
@@ -67,34 +67,62 @@ mongoose.connect(url)
         .then(products => {
           socket.emit('productosIniciales', products);
         })
-        .catch(err => console.log('Error al obtener productos:', err));
+        .catch(err => console.error('Error al obtener productos iniciales:', err.message));
 
       // Agregar un producto
       socket.on('agregarProducto', async (producto) => {
+        console.log('Producto recibido para agregar:', producto);
+
+        // Validar que todos los campos estén presentes
+        if (!producto.name || !producto.price || !producto.category) {
+          console.error('Faltan datos obligatorios al agregar producto.');
+          socket.emit('errorAgregarProducto', { mensaje: 'Todos los campos son obligatorios: nombre, precio y categoría.' });
+          return;
+        }
+
+        // Validar que el precio sea un número válido
+        const price = parseFloat(producto.price);
+        if (isNaN(price) || price <= 0) {
+          console.error('El precio debe ser un número positivo.');
+          socket.emit('errorAgregarProducto', { mensaje: 'El precio debe ser un número válido y positivo.' });
+          return;
+        }
+
         try {
+          // Crear el producto con datos válidos
           const newProduct = await productManager.addProduct({
-            name: producto.nombre,
-            price: producto.precio,
-            category: producto.categoria,
+            name: producto.name,
+            price,
+            category: producto.category,
             status: producto.disponible ? 'available' : 'unavailable',
           });
           io.emit('nuevoProducto', newProduct); // Emitir el nuevo producto a todos los clientes
         } catch (err) {
-          console.log('Error al agregar producto:', err);
+          console.error('Error al agregar producto:', err.message);
+          socket.emit('errorAgregarProducto', { mensaje: 'No se pudo agregar el producto. Intente nuevamente.' });
         }
       });
 
       // Eliminar un producto
       socket.on('eliminarProducto', async (id) => {
+        console.log('ID recibido para eliminar:', id);
+
+        if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+          console.error('ID no válido.');
+          socket.emit('errorEliminarProducto', { mensaje: 'ID no válido.' });
+          return;
+        }
+
         try {
           const success = await productManager.deleteProduct(id);
           if (success) {
             io.emit('productoEliminado', id); // Emitir la eliminación a todos los clientes
           } else {
-            console.log('Producto no encontrado para eliminar:', id);
+            console.error('Producto no encontrado para eliminar:', id);
           }
         } catch (err) {
-          console.log('Error al eliminar producto:', err);
+          console.error('Error al eliminar producto:', err.message);
+          socket.emit('errorEliminarProducto', { mensaje: 'No se pudo eliminar el producto. Intente nuevamente.' });
         }
       });
 
@@ -103,4 +131,4 @@ mongoose.connect(url)
       });
     });
   })
-  .catch(err => console.log('Error de conexión:', err));
+  .catch(err => console.error('Error de conexión a MongoDB:', err.message));
